@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hidden Maze Challenge — 3×3 Practice</title>
+<style>
+  :root {
+    --bg: #f3f4f6;
+    --panel: #ffffff;
+    --accent: #111827;
+  }
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+
+  .app {
+    width: 780px;
+    max-width: 95vw;
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 20px 22px 22px;
+    box-shadow: 0 14px 40px rgba(15,23,42,0.15);
+  }
+  .header {
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+
+  .instructions-box {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px 18px;
+    line-height: 1.48;
+  }
+  .instructions-box h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 17px;
+  }
+  .instructions-box ul {
+    margin: 0;
+    padding-left: 18px;
+    color: #374151;
+  }
+  .instructions-box li {
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  .btn {
+    padding: 10px 14px;
+    background: #111827;
+    color: white;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 600;
+    width: 100%;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+  .btn:hover {
+    background: #020617;
+  }
+  .btn-red {
+    background: #b91c1c;
+  }
+  .btn-red:hover {
+    background: #991b1b;
+  }
+
+  .hidden { display: none !important; }
+
+  .timer {
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .grid {
+    width: 280px;
+    height: 280px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    margin: 0 auto 10px auto;
+    background: #fff;
+    border: 2px solid #d1d5db;
+  }
+
+  /* Larger grid sizes for 7x7 and above */
+  .grid.size-7, .grid.size-8, .grid.size-9,
+  .grid.size-10, .grid.size-11, .grid.size-12 {
+    width: 500px;
+    height: 500px;
+    max-width: 90vw;
+    max-height: 90vw;
+  }
+
+  .cell {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: background .18s, transform .14s;
+  }
+
+  /* visited path cells (trail) */
+  .cell.path {
+    background: #222 !important;
+  }
+
+  /* player cell */
+  .player-cell {
+    background: #000 !important;
+  }
+
+  /* PERSON ICON */
+  .player-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  /* Key & Door */
+  .key {
+    font-size: 24px;
+    color: #000;
+  }
+  .door {
+    width: 26px;
+    height: 38px;
+    border: 3px solid #000;
+    border-radius: 3px;
+    position: relative;
+  }
+  .door::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background: #000;
+    border-radius: 50%;
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  /* wall-hit red flash */
+  .hit {
+    animation: hitAnim .25s;
+    background: #fecaca !important;
+  }
+  @keyframes hitAnim {
+    0% { background: #fca5a5; }
+    100% { background: #fecaca; }
+  }
+
+  .shake {
+    animation: shakeAnim .4s;
+  }
+  @keyframes shakeAnim {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 14px;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid #e5e7eb;
+    padding: 8px;
+    text-align: center;
+  }
+  th {
+    background: #f3f4f6;
+  }
+
+  /* Toast popup */
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #111827;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s ease;
+    z-index: 9999;
+  }
+  .toast.show {
+    opacity: 1;
+  }
+</style>
+</head>
+
+<body>
+
+<!-- Toast message -->
+<div id="toast" class="toast"></div>
+
+<div class="app">
+
+  <div class="header">Hidden Maze Challenge — 3×3 Practice</div>
+
+  <div id="intro" class="instructions-box">
+    <h3>How to Play</h3>
+    <ul>
+      <li>Hidden maze with invisible walls</li>
+      <li>Move using mouse or Arrow keys (W/A/S/D)</li>
+      <li>Collect all keys inside the maze</li>
+      <li>The door unlocks only after collecting all keys</li>
+      <li>Hitting a hidden wall flashes red and resets you</li>
+      <li>Your travelled path turns dark so you can track it</li>
+      <li>You have 4 minutes per round</li>
+    </ul>
+    <label for="levelSelect" style="display:block;margin-top:10px;font-weight:600;">Choose Level:</label>
+    <select id="levelSelect" style="width:100%;padding:8px;margin-top:6px;border:1px solid #d1d5db;border-radius:8px;"></select>
+    <button id="letsStart" class="btn">Start Practice</button>
+  </div>
+
+  <div id="game" class="hidden">
+    <div id="timer" class="timer">3:00</div>
+    <div id="grid" class="grid"></div>
+    <p style="text-align:center;">
+      Collect <b id="keysLabel">1 KEY</b> then get to the <b>DOOR</b>
+    </p>
+    <button id="stopSubmit" class="btn btn-red">Stop / Submit</button>
+  </div>
+
+  <div id="summary" class="hidden">
+    <h3>Session Summary</h3>
+    <table>
+      <thead>
+        <tr><th>Round</th><th>Time</th><th>Moves</th><th>Keys</th></tr>
+      </thead>
+      <tbody id="summaryTable"></tbody>
+    </table>
+    <button id="closeSummary" class="btn">Close</button>
+  </div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
