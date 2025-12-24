@@ -12,6 +12,10 @@
     const stopSubmitBtn = document.getElementById("stopSubmit");
     const closeSummaryBtn = document.getElementById("closeSummary");
     const levelSelectEl = document.getElementById("levelSelect");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const resumeBtn = document.getElementById("resumeBtn");
+    const returnMenuBtn = document.getElementById("returnMenuBtn");
+    const pauseOverlay = document.getElementById("pauseOverlay");
 
     // Build 150 levels with specified size and key rules
     function buildLevels() {
@@ -70,6 +74,9 @@
     let sessionResults = [];
     let hidePath = false;
     let playerPath = []; // Track the path traveled by player
+    let paused = false;
+    let pauseStartTime = 0;
+    let totalPausedTime = 0;
 
     function getRoundSeconds(lvl) {
         if (lvl <= 30) return 4 * 60;       // 1–30: 4 min
@@ -279,7 +286,7 @@
     }
 
     function onCellClick(r, c) {
-        if (!running) return;
+        if (!running || paused) return;
         if (Math.abs(r - player.r) + Math.abs(c - player.c) !== 1) return;
         attemptMove(r, c);
     }
@@ -337,7 +344,7 @@
     }
 
     window.onkeydown = e => {
-        if (!running) return;
+        if (!running || paused) return;
         let r = player.r, c = player.c;
         if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') r--;
         if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') r++;
@@ -358,6 +365,9 @@
         render();
 
         running = true;
+        paused = false;
+        pauseStartTime = 0;
+        totalPausedTime = 0;
         roundSeconds = getRoundSeconds(level);
         timerEl.textContent = formatTime(roundSeconds);
         roundStartTime = Date.now();
@@ -467,8 +477,9 @@
 
     function endRound(solved) {
         running = false;
+        paused = false;
         clearInterval(roundTimer);
-        const t = Math.floor((Date.now() - roundStartTime) / 1000);
+        const t = Math.floor((Date.now() - roundStartTime - totalPausedTime) / 1000);
         sessionResults.push({ round: level, time: t, moves, keys: keysCollected, solved });
 
         // Advance only on success; on failure retry the same level.
@@ -529,5 +540,36 @@
     letsStartBtn.onclick = () => {
         level = parseInt(levelSelectEl.value, 10);
         startRound();
+    };
+
+    // Pause functionality
+    pauseBtn.onclick = () => {
+        if (!running || paused) return;
+        paused = true;
+        pauseStartTime = Date.now();
+        pauseOverlay.classList.remove('hidden');
+        showToast('⏸ Game Paused');
+    };
+
+    resumeBtn.onclick = () => {
+        if (!paused) return;
+        totalPausedTime += Date.now() - pauseStartTime;
+        paused = false;
+        pauseOverlay.classList.add('hidden');
+        showToast('▶ Game Resumed');
+    };
+
+    returnMenuBtn.onclick = () => {
+        if (running) {
+            running = false;
+            paused = false;
+            clearInterval(roundTimer);
+            const t = Math.floor((Date.now() - roundStartTime - totalPausedTime) / 1000);
+            sessionResults.push({ round: level, time: t, moves, keys: keysCollected, solved: false });
+        }
+        pauseOverlay.classList.add('hidden');
+        gameEl.classList.add('hidden');
+        introEl.classList.remove('hidden');
+        showToast('Returned to menu');
     };
 })();

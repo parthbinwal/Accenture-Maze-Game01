@@ -351,6 +351,51 @@
     100% { opacity: 0; transform: scale(0.95); }
   }
 
+  /* Pause overlay */
+  .pause-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(8px);
+  }
+  .pause-menu {
+    background: white;
+    border-radius: 16px;
+    padding: 32px 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    min-width: 300px;
+  }
+  .pause-menu h2 {
+    margin: 0 0 24px 0;
+    font-size: 32px;
+    color: #111827;
+  }
+  .pause-menu .btn {
+    margin-top: 10px;
+  }
+  .btn-pause {
+    padding: 8px 16px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    margin-left: 10px;
+  }
+  .btn-pause:hover {
+    background: #4f46e5;
+  }
+
   /* wall-hit red flash */
   .hit {
     animation: hitAnim .25s;
@@ -439,7 +484,19 @@
     <p style="text-align:center;">
       Collect <b id="keysLabel">1 KEY</b> then get to the <b>DOOR</b>
     </p>
-    <button id="stopSubmit" class="btn btn-red">Stop / Submit</button>
+    <div style="display: flex; gap: 10px;">
+      <button id="pauseBtn" class="btn-pause" style="flex: 0 0 auto;">⏸ Pause</button>
+      <button id="stopSubmit" class="btn btn-red" style="flex: 1;">Stop / Submit</button>
+    </div>
+  </div>
+
+  <!-- Pause Overlay -->
+  <div id="pauseOverlay" class="pause-overlay hidden">
+    <div class="pause-menu">
+      <h2>⏸ PAUSED</h2>
+      <button id="resumeBtn" class="btn">Resume Game</button>
+      <button id="returnMenuBtn" class="btn">Return to Menu</button>
+    </div>
   </div>
 
   <div id="summary" class="hidden">
