@@ -13,14 +13,50 @@
     const closeSummaryBtn = document.getElementById("closeSummary");
     const levelSelectEl = document.getElementById("levelSelect");
 
-    const LEVELS = Array.from({ length: 100 }, (_, i) => {
-        const level = i + 1;
-        const size = Math.min(3 + Math.floor((level - 1) / 10), 12); // 3->12 over 100 levels
-        const keys = Math.min(1 + Math.floor((level - 1) / 34), 3); // 1 to 3 keys
-        return { level, size, keys };
-    });
+    // Build 150 levels with specified size and key rules
+    function buildLevels() {
+        const levels = [];
+        // First 100 levels: sizes cycle through [3,5,6..12]
+        const cycle1 = [3, 5, 6, 7, 8, 9, 10, 11, 12];
+        for (let i = 1; i <= 100; i++) {
+            const size = cycle1[(i - 1) % cycle1.length];
+            const keys = (() => {
+                if (size === 3 || size === 5) return 1;
+                if (size >= 6 && size <= 9) {
+                    // Start with 1 key, increase to 2 later in the set
+                    return i <= 60 ? 1 : 2;
+                }
+                // size 10–12: start at 1, then 2, then 3
+                if (i <= 33) return 1;
+                if (i <= 66) return 2;
+                return 3;
+            })();
+            levels.push({ level: i, size, keys });
+        }
 
-    let level = 21;
+        // Levels 101–150: sizes cycle through [5,6..12], path hidden
+        const cycle2 = [5, 6, 7, 8, 9, 10, 11, 12];
+        for (let i = 101; i <= 150; i++) {
+            const size = cycle2[(i - 101) % cycle2.length];
+            const keys = (() => {
+                if (size === 5) return 1;
+                if (size >= 6 && size <= 9) {
+                    // Start with 1 key, increase to 2 later in the set
+                    return i <= 125 ? 1 : 2;
+                }
+                // size 10–12: start at 1, then 2, then 3 as difficulty increases
+                if (i <= 116) return 1;
+                if (i <= 133) return 2;
+                return 3;
+            })();
+            levels.push({ level: i, size, keys, hiddenPath: true });
+        }
+        return levels;
+    }
+
+    const LEVELS = buildLevels();
+
+    let level = 1;
     let rows = 5, cols = 5;
     let player = { r: 0, c: 0 };
     let startPos = { r: 0, c: 0 };
@@ -32,6 +68,15 @@
     let roundStartTime = 0;
     let cells = [];
     let sessionResults = [];
+    let hidePath = false;
+
+    function getRoundSeconds(lvl) {
+        if (lvl <= 30) return 4 * 60;       // 1–30: 4 min
+        if (lvl <= 60) return 6 * 60;       // 31–60: 6 min
+        if (lvl <= 90) return 8 * 60;       // 61–90: 8 min
+        if (lvl <= 100) return 10 * 60;     // 91–100: 10 min
+        return 30 * 60;                     // 101–150: 30 min
+    }
 
     function idx(r, c) { return r * cols + c; }
     function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } }
@@ -50,6 +95,7 @@
         level = cfg.level;
         rows = cols = cfg.size;
         keysNeeded = cfg.keys;
+        hidePath = !!cfg.hiddenPath;
         headerEl.textContent = `Hidden Maze Challenge — Level ${level} (${rows}×${cols})`;
         keysLabelEl.textContent = keysNeeded === 1 ? "1 KEY" : `${keysNeeded} KEYS`;
         gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
@@ -153,6 +199,7 @@
     }
 
     function markPath(r, c) {
+        if (hidePath) return;
         gridEl.children[idx(r, c)].classList.add("path");
     }
     function clearPath() {
@@ -257,7 +304,7 @@
         render();
 
         running = true;
-        roundSeconds = 240;
+        roundSeconds = getRoundSeconds(level);
         timerEl.textContent = formatTime(roundSeconds);
         roundStartTime = Date.now();
 
@@ -279,9 +326,9 @@
         const t = Math.floor((Date.now() - roundStartTime) / 1000);
         sessionResults.push({ round: level, time: t, moves, keys: keysCollected, solved });
 
-        // Advance only on success; on failure retry the same level (covers losing on any level, including 9).
+        // Advance only on success; on failure retry the same level.
         if (solved) {
-            level = level >= 100 ? 1 : level + 1;
+            level = level >= 150 ? 1 : level + 1;
         }
 
         setTimeout(() => startRound(), 350);
@@ -317,11 +364,12 @@
     };
 
     // Populate level selector
-    for (let i = 1; i <= 100; i++) {
+    for (let i = 1; i <= 150; i++) {
         const opt = document.createElement("option");
         opt.value = i;
         const cfg = LEVELS[i - 1];
-        opt.textContent = `Level ${i} (${cfg.size}×${cfg.size}, ${cfg.keys} ${cfg.keys === 1 ? 'key' : 'keys'})`;
+        const hidden = cfg.hiddenPath ? " — hidden path" : "";
+        opt.textContent = `Level ${i} (${cfg.size}×${cfg.size}, ${cfg.keys} ${cfg.keys === 1 ? 'key' : 'keys'})${hidden}`;
         if (i === level) opt.selected = true;
         levelSelectEl.appendChild(opt);
     }

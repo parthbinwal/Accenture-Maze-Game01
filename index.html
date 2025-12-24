@@ -224,7 +224,7 @@
 
 <div class="app">
 
-  <div class="header">Hidden Maze Challenge — 3×3 Practice</div>
+  <div class="header">Hidden Maze Challenge</div>
 
   <div id="intro" class="instructions-box">
     <h3>How to Play</h3>
@@ -234,8 +234,9 @@
       <li>Collect all keys inside the maze</li>
       <li>The door unlocks only after collecting all keys</li>
       <li>Hitting a hidden wall flashes red and resets you</li>
-      <li>Your travelled path turns dark so you can track it</li>
-      <li>You have 4 minutes per round</li>
+      <li>Your travelled path turns dark in Levels 1–100</li>
+      <li>In Levels 101–150, your travelled path stays hidden</li>
+      <li>Round time increases with level (4–30 minutes)</li>
     </ul>
     <label for="levelSelect" style="display:block;margin-top:10px;font-weight:600;">Choose Level:</label>
     <select id="levelSelect" style="width:100%;padding:8px;margin-top:6px;border:1px solid #d1d5db;border-radius:8px;"></select>
@@ -243,7 +244,7 @@
   </div>
 
   <div id="game" class="hidden">
-    <div id="timer" class="timer">3:00</div>
+    <div id="timer" class="timer">4:00</div>
     <div id="grid" class="grid"></div>
     <p style="text-align:center;">
       Collect <b id="keysLabel">1 KEY</b> then get to the <b>DOOR</b>
