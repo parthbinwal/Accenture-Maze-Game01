@@ -69,6 +69,7 @@
     let cells = [];
     let sessionResults = [];
     let hidePath = false;
+    let playerPath = []; // Track the path traveled by player
 
     function getRoundSeconds(lvl) {
         if (lvl <= 30) return 4 * 60;       // 1–30: 4 min
@@ -206,6 +207,55 @@
         document.querySelectorAll(".cell.path").forEach(el => el.classList.remove("path"));
     }
 
+    // Calculate optimal path from start to door collecting all keys using BFS
+    function calculateSolutionPath() {
+        // BFS to find shortest path collecting all keys
+        const queue = [{ r: startPos.r, c: startPos.c, keysFound: [], path: [{ r: startPos.r, c: startPos.c }] }];
+        const visited = new Set();
+        visited.add(`${startPos.r},${startPos.c},`);
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const { r, c, keysFound, path } = current;
+
+            // Check if we reached the door with all keys
+            if (r === door.r && c === door.c && keysFound.length === keysNeeded) {
+                return path;
+            }
+
+            // Get neighbors based on walls
+            const w = cells[idx(r, c)].walls;
+            const neighbors = [];
+            if (!w.u && r - 1 >= 0) neighbors.push([r - 1, c]);
+            if (!w.r && c + 1 < cols) neighbors.push([r, c + 1]);
+            if (!w.d && r + 1 < rows) neighbors.push([r + 1, c]);
+            if (!w.l && c - 1 >= 0) neighbors.push([r, c - 1]);
+
+            for (const [nr, nc] of neighbors) {
+                let newKeysFound = [...keysFound];
+                
+                // Check if this position has a key we haven't collected
+                const keyAtPos = originalKeys.find(k => k.r === nr && k.c === nc);
+                if (keyAtPos && !newKeysFound.some(k => k.r === nr && k.c === nc)) {
+                    newKeysFound.push({ r: nr, c: nc });
+                }
+
+                const stateKey = `${nr},${nc},${newKeysFound.map(k => `${k.r}-${k.c}`).sort().join(',')}`;
+                if (!visited.has(stateKey)) {
+                    visited.add(stateKey);
+                    queue.push({
+                        r: nr,
+                        c: nc,
+                        keysFound: newKeysFound,
+                        path: [...path, { r: nr, c: nc }]
+                    });
+                }
+            }
+        }
+
+        return []; // No solution found
+    }
+
     function render() {
         const all = document.querySelectorAll(".cell");
         all.forEach(el => { el.innerHTML = ""; el.classList.remove("hit", "player-cell"); });
@@ -261,6 +311,7 @@
             keys = originalKeys.map(k => ({ ...k }));
             keysCollected = 0;
             moves = 0;
+            playerPath = [{ r: startPos.r, c: startPos.c }]; // Reset path on wall hit
             clearPath();
             render();
             return;
@@ -268,6 +319,7 @@
 
         markPath(player.r, player.c);
         player = { r: tr, c: tc };
+        playerPath.push({ r: tr, c: tc }); // Track the path
         moves++;
 
         const fi = keys.findIndex(k => k.r === player.r && k.c === player.c);
@@ -279,7 +331,8 @@
         render();
 
         if (keysCollected >= keysNeeded && player.r === door.r && player.c === door.c) {
-            endRound(true);
+            // Trigger door opening animation and level complete celebration
+            celebrateLevelComplete();
         }
     }
 
@@ -300,6 +353,7 @@
         placeKeysRandom();
         moves = 0;
         keysCollected = 0;
+        playerPath = [{ r: startPos.r, c: startPos.c }]; // Initialize with start position
         clearPath();
         render();
 
@@ -320,6 +374,97 @@
         gameEl.classList.remove("hidden");
     }
 
+    function showPathWithAnimation(pathArray, className) {
+        // Animate the path reveal
+        pathArray.forEach((pos, i) => {
+            setTimeout(() => {
+                const cell = gridEl.children[idx(pos.r, pos.c)];
+                cell.classList.add(className);
+            }, i * 30); // 30ms delay between each cell
+        });
+    }
+
+    function celebrateLevelComplete() {
+        running = false;
+        
+        const doorCell = gridEl.children[idx(door.r, door.c)];
+        const doorElement = doorCell.querySelector('.door');
+        
+        if (doorElement) {
+            // Step 1: Door unlock shake animation
+            doorElement.classList.add('unlocking');
+            
+            // Step 2: Create sparkle particles
+            setTimeout(() => {
+                createSparkles(doorCell);
+            }, 300);
+            
+            // Step 3: Add radial burst effect
+            setTimeout(() => {
+                const burst = document.createElement('div');
+                burst.className = 'door-burst';
+                doorCell.appendChild(burst);
+                setTimeout(() => burst.remove(), 1000);
+            }, 500);
+            
+            // Step 4: Door swings open
+            setTimeout(() => {
+                doorElement.classList.add('opening');
+                doorElement.classList.remove('unlocking');
+            }, 600);
+        }
+        
+        doorCell.classList.add('success');
+        
+        // Show the player's traveled path with animation
+        showPathWithAnimation(playerPath, 'traveled-path');
+        
+        // Add level complete overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'level-complete-overlay';
+        overlay.textContent = '🎉 LEVEL UP! 🎉';
+        gameEl.style.position = 'relative';
+        gameEl.appendChild(overlay);
+        
+        // Show toast message
+        showToast('🎊 Level Complete! Your path is highlighted...');
+        
+        // End round after animations complete
+        setTimeout(() => {
+            overlay.remove();
+            endRound(true);
+        }, 2500);
+    }
+    
+    function createSparkles(parentCell) {
+        const colors = ['#fbbf24', '#f59e0b', '#10b981', '#34d399', '#60a5fa'];
+        const sparkleCount = 12;
+        
+        for (let i = 0; i < sparkleCount; i++) {
+            setTimeout(() => {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                sparkle.style.background = colors[Math.floor(Math.random() * colors.length)];
+                
+                // Random direction
+                const angle = (Math.PI * 2 * i) / sparkleCount;
+                const distance = 30 + Math.random() * 20;
+                const tx = Math.cos(angle) * distance;
+                const ty = Math.sin(angle) * distance;
+                
+                sparkle.style.setProperty('--tx', `${tx}px`);
+                sparkle.style.setProperty('--ty', `${ty}px`);
+                
+                sparkle.style.left = '50%';
+                sparkle.style.top = '50%';
+                
+                parentCell.appendChild(sparkle);
+                
+                setTimeout(() => sparkle.remove(), 1000);
+            }, i * 50);
+        }
+    }
+
     function endRound(solved) {
         running = false;
         clearInterval(roundTimer);
@@ -329,9 +474,16 @@
         // Advance only on success; on failure retry the same level.
         if (solved) {
             level = level >= 150 ? 1 : level + 1;
+            setTimeout(() => startRound(), 350);
+        } else {
+            // Show solution path on failure
+            showToast('⏱️ Time\'s up! Here\'s the solution path...');
+            const solutionPath = calculateSolutionPath();
+            if (solutionPath.length > 0) {
+                showPathWithAnimation(solutionPath, 'solution-path');
+            }
+            setTimeout(() => startRound(), 3000); // Give more time to see solution
         }
-
-        setTimeout(() => startRound(), 350);
     }
 
     stopSubmitBtn.onclick = () => {
