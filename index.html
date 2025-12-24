@@ -396,6 +396,140 @@
     background: #4f46e5;
   }
 
+  /* Tutorial overlay */
+  .tutorial-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tutorial-box {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 500px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    position: relative;
+  }
+
+  .tutorial-box h2 {
+    margin: 0 0 16px 0;
+    color: #111827;
+    font-size: 28px;
+  }
+
+  .tutorial-box p {
+    margin: 12px 0;
+    color: #374151;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  .tutorial-step {
+    font-size: 14px;
+    color: #6366f1;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .tutorial-buttons {
+    margin-top: 24px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .btn-tutorial {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .btn-tutorial-primary {
+    background: #6366f1;
+    color: white;
+  }
+
+  .btn-tutorial-primary:hover {
+    background: #4f46e5;
+  }
+
+  .btn-tutorial-secondary {
+    background: #e5e7eb;
+    color: #374151;
+  }
+
+  .btn-tutorial-secondary:hover {
+    background: #d1d5db;
+  }
+
+  /* Tutorial tooltip arrow */
+  .tutorial-tooltip {
+    position: absolute;
+    background: #6366f1;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 2001;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    animation: tooltipPulse 2s ease-in-out infinite;
+  }
+
+  .tutorial-tooltip::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-style: solid;
+  }
+
+  .tutorial-tooltip.bottom::after {
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 0 8px 8px 8px;
+    border-color: transparent transparent #6366f1 transparent;
+  }
+
+  .tutorial-tooltip.top::after {
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 8px 8px 0 8px;
+    border-color: #6366f1 transparent transparent transparent;
+  }
+
+  @keyframes tooltipPulse {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  /* Tutorial highlight */
+  .tutorial-highlight {
+    position: relative;
+    z-index: 2001 !important;
+    box-shadow: 0 0 0 4px #6366f1, 0 0 20px rgba(99, 102, 241, 0.6) !important;
+    animation: highlightPulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes highlightPulse {
+    0%, 100% { box-shadow: 0 0 0 4px #6366f1, 0 0 20px rgba(99, 102, 241, 0.6); }
+    50% { box-shadow: 0 0 0 6px #6366f1, 0 0 30px rgba(99, 102, 241, 0.8); }
+  }
+
   /* wall-hit red flash */
   .hit {
     animation: hitAnim .25s;
@@ -475,17 +609,20 @@
     </ul>
     <label for="levelSelect" style="display:block;margin-top:10px;font-weight:600;">Choose Level:</label>
     <select id="levelSelect" style="width:100%;padding:8px;margin-top:6px;border:1px solid #d1d5db;border-radius:8px;"></select>
+    <button id="tutorialBtn" class="btn" style="background:#6366f1;margin-top:12px;">🎓 Start Tutorial</button>
     <button id="letsStart" class="btn">Start Practice</button>
   </div>
 
   <div id="game" class="hidden">
     <div id="timer" class="timer">4:00</div>
+    <div id="boostsDisplay" style="text-align: center; font-size: 14px; color: #6366f1; font-weight: 600; margin-bottom: 8px;">Boosts Available: <span id="boostCount">0</span></div>
     <div id="grid" class="grid"></div>
     <p style="text-align:center;">
       Collect <b id="keysLabel">1 KEY</b> then get to the <b>DOOR</b>
     </p>
     <div style="display: flex; gap: 10px;">
       <button id="pauseBtn" class="btn-pause" style="flex: 0 0 auto;">⏸ Pause</button>
+      <button id="addTimeBtn" class="btn-pause" style="flex: 0 0 auto;">⏱️ +60s</button>
       <button id="stopSubmit" class="btn btn-red" style="flex: 1;">Stop / Submit</button>
     </div>
   </div>
@@ -496,6 +633,19 @@
       <h2>⏸ PAUSED</h2>
       <button id="resumeBtn" class="btn">Resume Game</button>
       <button id="returnMenuBtn" class="btn">Return to Menu</button>
+    </div>
+  </div>
+
+  <!-- Tutorial Overlay -->
+  <div id="tutorialOverlay" class="tutorial-overlay hidden">
+    <div class="tutorial-box">
+      <div class="tutorial-step" id="tutorialStep">Step 1 of 5</div>
+      <h2 id="tutorialTitle">Welcome!</h2>
+      <p id="tutorialText">Let's learn how to play the Hidden Maze Challenge!</p>
+      <div class="tutorial-buttons">
+        <button id="tutorialSkip" class="btn-tutorial btn-tutorial-secondary">Skip Tutorial</button>
+        <button id="tutorialNext" class="btn-tutorial btn-tutorial-primary">Next</button>
+      </div>
     </div>
   </div>
 

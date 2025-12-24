@@ -7,52 +7,55 @@
     const summaryTable = document.getElementById("summaryTable");
     const keysLabelEl = document.getElementById("keysLabel");
     const headerEl = document.querySelector(".header");
+    const boostCountEl = document.getElementById("boostCount");
 
     const letsStartBtn = document.getElementById("letsStart");
     const stopSubmitBtn = document.getElementById("stopSubmit");
     const closeSummaryBtn = document.getElementById("closeSummary");
     const levelSelectEl = document.getElementById("levelSelect");
     const pauseBtn = document.getElementById("pauseBtn");
+    const addTimeBtn = document.getElementById("addTimeBtn");
     const resumeBtn = document.getElementById("resumeBtn");
     const returnMenuBtn = document.getElementById("returnMenuBtn");
     const pauseOverlay = document.getElementById("pauseOverlay");
+    const tutorialBtn = document.getElementById("tutorialBtn");
+    const tutorialOverlay = document.getElementById("tutorialOverlay");
+    const tutorialStep = document.getElementById("tutorialStep");
+    const tutorialTitle = document.getElementById("tutorialTitle");
+    const tutorialText = document.getElementById("tutorialText");
+    const tutorialNext = document.getElementById("tutorialNext");
+    const tutorialSkip = document.getElementById("tutorialSkip");
 
     // Build 150 levels with specified size and key rules
     function buildLevels() {
         const levels = [];
-        // First 100 levels: sizes cycle through [3,5,6..12]
-        const cycle1 = [3, 5, 6, 7, 8, 9, 10, 11, 12];
+        const sizes = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        const keyCycles = {
+            3: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            4: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            5: [1, 1, 1, 1, 2, 2, 2, 3, 3, 3],
+            6: [1, 1, 1, 1, 2, 2, 2, 3, 3, 3],
+            7: [1, 1, 1, 2, 2, 2, 3, 3, 4, 4],
+            8: [1, 1, 1, 2, 2, 2, 3, 3, 4, 4],
+            9: [1, 1, 1, 2, 2, 2, 3, 3, 4, 4],
+            10: [1, 1, 1, 2, 2, 2, 3, 3, 4, 4],
+            11: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
+            12: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]
+        };
+
         for (let i = 1; i <= 100; i++) {
-            const size = cycle1[(i - 1) % cycle1.length];
-            const keys = (() => {
-                if (size === 3 || size === 5) return 1;
-                if (size >= 6 && size <= 9) {
-                    // Start with 1 key, increase to 2 later in the set
-                    return i <= 60 ? 1 : 2;
-                }
-                // size 10–12: start at 1, then 2, then 3
-                if (i <= 33) return 1;
-                if (i <= 66) return 2;
-                return 3;
-            })();
+            const sizeIndex = Math.floor((i - 1) / 10);
+            const size = sizes[Math.min(sizeIndex, sizes.length - 1)];
+            const levelInSize = (i - 1) % 10;
+            const keys = keyCycles[size][levelInSize];
             levels.push({ level: i, size, keys });
         }
 
-        // Levels 101–150: sizes cycle through [5,6..12], path hidden
+        // Levels 101–150: sizes cycle through [5,6..12], path hidden, with 2-3 keys
         const cycle2 = [5, 6, 7, 8, 9, 10, 11, 12];
         for (let i = 101; i <= 150; i++) {
             const size = cycle2[(i - 101) % cycle2.length];
-            const keys = (() => {
-                if (size === 5) return 1;
-                if (size >= 6 && size <= 9) {
-                    // Start with 1 key, increase to 2 later in the set
-                    return i <= 125 ? 1 : 2;
-                }
-                // size 10–12: start at 1, then 2, then 3 as difficulty increases
-                if (i <= 116) return 1;
-                if (i <= 133) return 2;
-                return 3;
-            })();
+            const keys = size >= 11 ? 3 : 2;
             levels.push({ level: i, size, keys, hiddenPath: true });
         }
         return levels;
@@ -73,17 +76,21 @@
     let cells = [];
     let sessionResults = [];
     let hidePath = false;
-    let playerPath = []; // Track the path traveled by player
+    let playerPath = [];
     let paused = false;
     let pauseStartTime = 0;
     let totalPausedTime = 0;
+    let inTutorial = false;
+    let tutorialStepIndex = 0;
+    let tutorialTooltip = null;
+    let earnedBoosts = parseInt(localStorage.getItem("earnedBoosts") || "0", 10);
 
     function getRoundSeconds(lvl) {
-        if (lvl <= 30) return 4 * 60;       // 1–30: 4 min
-        if (lvl <= 60) return 6 * 60;       // 31–60: 6 min
-        if (lvl <= 90) return 8 * 60;       // 61–90: 8 min
-        if (lvl <= 100) return 10 * 60;     // 91–100: 10 min
-        return 30 * 60;                     // 101–150: 30 min
+        if (lvl <= 30) return 4 * 60;
+        if (lvl <= 60) return 6 * 60;
+        if (lvl <= 90) return 8 * 60;
+        if (lvl <= 100) return 10 * 60;
+        return 30 * 60;
     }
 
     function idx(r, c) { return r * cols + c; }
@@ -97,7 +104,143 @@
         setTimeout(() => t.classList.remove("show"), 1200);
     }
 
-    /* LEVEL CONFIG */
+    function updateBoostDisplay() {
+        boostCountEl.textContent = earnedBoosts;
+    }
+
+    const tutorialSteps = [
+        {
+            title: "Welcome to Hidden Maze! 🎮",
+            text: "This is a puzzle game where you navigate through invisible mazes. Let's learn the basics!",
+            highlight: null
+        },
+        {
+            title: "The Grid 🔲",
+            text: "This is your maze grid. The walls are invisible, so you'll need to explore carefully by clicking adjacent cells or using arrow keys (W/A/S/D).",
+            highlight: "grid",
+            action: () => {
+                if (!running) {
+                    level = 1;
+                    startTutorialRound();
+                }
+            }
+        },
+        {
+            title: "Collect Keys 🗝️",
+            text: "Your goal is to find and collect all the keys in the maze. Keys are marked with a 🗝️ emoji. Try moving around to explore!",
+            highlight: "grid"
+        },
+        {
+            title: "Reach the Door 🚪",
+            text: "After collecting all keys, go to the door (purple box at bottom-right). The door will only open when you have all keys!",
+            highlight: "grid"
+        },
+        {
+            title: "Watch Out for Walls! ⚠️",
+            text: "If you hit an invisible wall, you'll flash red and reset to start. Your visited path (dark trail) helps you remember where you've been. Good luck!",
+            highlight: "grid"
+        }
+    ];
+
+    function showTutorialStep(index) {
+        if (index >= tutorialSteps.length) {
+            endTutorial();
+            return;
+        }
+
+        tutorialStepIndex = index;
+        const step = tutorialSteps[index];
+        
+        tutorialStep.textContent = `Step ${index + 1} of ${tutorialSteps.length}`;
+        tutorialTitle.textContent = step.title;
+        tutorialText.textContent = step.text;
+        tutorialNext.textContent = index === tutorialSteps.length - 1 ? "Start Playing!" : "Next";
+
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+        });
+        if (tutorialTooltip) {
+            tutorialTooltip.remove();
+            tutorialTooltip = null;
+        }
+
+        if (step.highlight) {
+            const element = document.getElementById(step.highlight);
+            if (element) {
+                element.classList.add('tutorial-highlight');
+            }
+        }
+
+        if (step.action) {
+            step.action();
+        }
+    }
+
+    function startTutorialRound() {
+        rows = cols = 3;
+        keysNeeded = 1;
+        hidePath = false;
+        headerEl.textContent = "Hidden Maze Challenge — Tutorial (3×3)";
+        keysLabelEl.textContent = "1 KEY";
+        gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        gridEl.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+        gridEl.className = 'grid';
+
+        buildGrid();
+        placeEntities();
+        placeKeysRandom();
+        moves = 0;
+        keysCollected = 0;
+        playerPath = [{ r: startPos.r, c: startPos.c }];
+        clearPath();
+        render();
+
+        running = true;
+        inTutorial = true;
+        roundSeconds = 600;
+        timerEl.textContent = formatTime(roundSeconds);
+        roundStartTime = Date.now();
+        totalPausedTime = 0;
+
+        clearInterval(roundTimer);
+        roundTimer = setInterval(() => {
+            if (!paused) {
+                roundSeconds--;
+                timerEl.textContent = formatTime(roundSeconds);
+                if (roundSeconds <= 0) endTutorialRound();
+            }
+        }, 1000);
+
+        introEl.classList.add("hidden");
+        summaryEl.classList.add("hidden");
+        gameEl.classList.remove("hidden");
+    }
+
+    function endTutorialRound() {
+        running = false;
+        inTutorial = false;
+        clearInterval(roundTimer);
+        showToast('🎉 Tutorial complete! Ready to play?');
+        setTimeout(() => {
+            gameEl.classList.add("hidden");
+            introEl.classList.remove("hidden");
+        }, 1500);
+    }
+
+    function endTutorial() {
+        tutorialOverlay.classList.add('hidden');
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+        });
+        
+        if (inTutorial && running) {
+            showToast('Complete this level to finish tutorial!');
+        } else {
+            localStorage.setItem('tutorialCompleted', 'true');
+            showToast('Tutorial complete! Select a level to begin.');
+        }
+    }
+
     function applyLevelConfig(lvl) {
         const cfg = LEVELS[lvl - 1] || LEVELS[LEVELS.length - 1];
         level = cfg.level;
@@ -109,14 +252,12 @@
         gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
         gridEl.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
         
-        // Add size class for larger grids (7x7 and above)
         gridEl.className = 'grid';
         if (rows >= 7) {
             gridEl.classList.add(`size-${rows}`);
         }
     }
 
-    /* MAZE GENERATOR */
     function generatePerfectMaze() {
         const base = Array.from({ length: rows * cols }, () => ({ u: true, r: true, d: true, l: true }));
         const visited = Array(rows * cols).fill(false);
@@ -214,9 +355,7 @@
         document.querySelectorAll(".cell.path").forEach(el => el.classList.remove("path"));
     }
 
-    // Calculate optimal path from start to door collecting all keys using BFS
     function calculateSolutionPath() {
-        // BFS to find shortest path collecting all keys
         const queue = [{ r: startPos.r, c: startPos.c, keysFound: [], path: [{ r: startPos.r, c: startPos.c }] }];
         const visited = new Set();
         visited.add(`${startPos.r},${startPos.c},`);
@@ -225,12 +364,10 @@
             const current = queue.shift();
             const { r, c, keysFound, path } = current;
 
-            // Check if we reached the door with all keys
             if (r === door.r && c === door.c && keysFound.length === keysNeeded) {
                 return path;
             }
 
-            // Get neighbors based on walls
             const w = cells[idx(r, c)].walls;
             const neighbors = [];
             if (!w.u && r - 1 >= 0) neighbors.push([r - 1, c]);
@@ -241,7 +378,6 @@
             for (const [nr, nc] of neighbors) {
                 let newKeysFound = [...keysFound];
                 
-                // Check if this position has a key we haven't collected
                 const keyAtPos = originalKeys.find(k => k.r === nr && k.c === nc);
                 if (keyAtPos && !newKeysFound.some(k => k.r === nr && k.c === nc)) {
                     newKeysFound.push({ r: nr, c: nc });
@@ -260,7 +396,7 @@
             }
         }
 
-        return []; // No solution found
+        return [];
     }
 
     function render() {
@@ -318,7 +454,7 @@
             keys = originalKeys.map(k => ({ ...k }));
             keysCollected = 0;
             moves = 0;
-            playerPath = [{ r: startPos.r, c: startPos.c }]; // Reset path on wall hit
+            playerPath = [{ r: startPos.r, c: startPos.c }];
             clearPath();
             render();
             return;
@@ -326,7 +462,7 @@
 
         markPath(player.r, player.c);
         player = { r: tr, c: tc };
-        playerPath.push({ r: tr, c: tc }); // Track the path
+        playerPath.push({ r: tr, c: tc });
         moves++;
 
         const fi = keys.findIndex(k => k.r === player.r && k.c === player.c);
@@ -338,8 +474,11 @@
         render();
 
         if (keysCollected >= keysNeeded && player.r === door.r && player.c === door.c) {
-            // Trigger door opening animation and level complete celebration
-            celebrateLevelComplete();
+            if (inTutorial) {
+                celebrateTutorialComplete();
+            } else {
+                celebrateLevelComplete();
+            }
         }
     }
 
@@ -360,9 +499,10 @@
         placeKeysRandom();
         moves = 0;
         keysCollected = 0;
-        playerPath = [{ r: startPos.r, c: startPos.c }]; // Initialize with start position
+        playerPath = [{ r: startPos.r, c: startPos.c }];
         clearPath();
         render();
+        updateBoostDisplay();
 
         running = true;
         paused = false;
@@ -374,9 +514,11 @@
 
         clearInterval(roundTimer);
         roundTimer = setInterval(() => {
-            roundSeconds--;
-            timerEl.textContent = formatTime(roundSeconds);
-            if (roundSeconds <= 0) endRound(false);
+            if (!paused) {
+                roundSeconds--;
+                timerEl.textContent = formatTime(roundSeconds);
+                if (roundSeconds <= 0) endRound(false);
+            }
         }, 1000);
 
         introEl.classList.add("hidden");
@@ -385,31 +527,74 @@
     }
 
     function showPathWithAnimation(pathArray, className) {
-        // Animate the path reveal
         pathArray.forEach((pos, i) => {
             setTimeout(() => {
                 const cell = gridEl.children[idx(pos.r, pos.c)];
                 cell.classList.add(className);
-            }, i * 30); // 30ms delay between each cell
+            }, i * 30);
         });
     }
 
-    function celebrateLevelComplete() {
+    function celebrateTutorialComplete() {
         running = false;
+        inTutorial = false;
         
         const doorCell = gridEl.children[idx(door.r, door.c)];
         const doorElement = doorCell.querySelector('.door');
         
         if (doorElement) {
-            // Step 1: Door unlock shake animation
+            doorElement.classList.add('unlocking');
+            setTimeout(() => {
+                createSparkles(doorCell);
+            }, 300);
+            setTimeout(() => {
+                const burst = document.createElement('div');
+                burst.className = 'door-burst';
+                doorCell.appendChild(burst);
+                setTimeout(() => burst.remove(), 1000);
+            }, 500);
+            setTimeout(() => {
+                doorElement.classList.add('opening');
+                doorElement.classList.remove('unlocking');
+            }, 600);
+        }
+        
+        doorCell.classList.add('success');
+        showPathWithAnimation(playerPath, 'traveled-path');
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'level-complete-overlay';
+        overlay.textContent = '🎓 Tutorial Complete! 🎓';
+        gameEl.style.position = 'relative';
+        gameEl.appendChild(overlay);
+        
+        showToast('🎊 Great job! You\'re ready to play!');
+        localStorage.setItem('tutorialCompleted', 'true');
+        
+        setTimeout(() => {
+            overlay.remove();
+            clearInterval(roundTimer);
+            gameEl.classList.add('hidden');
+            introEl.classList.remove('hidden');
+        }, 2500);
+    }
+
+    function celebrateLevelComplete() {
+        running = false;
+        earnedBoosts++;
+        localStorage.setItem("earnedBoosts", earnedBoosts.toString());
+        updateBoostDisplay();
+        
+        const doorCell = gridEl.children[idx(door.r, door.c)];
+        const doorElement = doorCell.querySelector('.door');
+        
+        if (doorElement) {
             doorElement.classList.add('unlocking');
             
-            // Step 2: Create sparkle particles
             setTimeout(() => {
                 createSparkles(doorCell);
             }, 300);
             
-            // Step 3: Add radial burst effect
             setTimeout(() => {
                 const burst = document.createElement('div');
                 burst.className = 'door-burst';
@@ -417,7 +602,6 @@
                 setTimeout(() => burst.remove(), 1000);
             }, 500);
             
-            // Step 4: Door swings open
             setTimeout(() => {
                 doorElement.classList.add('opening');
                 doorElement.classList.remove('unlocking');
@@ -426,20 +610,16 @@
         
         doorCell.classList.add('success');
         
-        // Show the player's traveled path with animation
         showPathWithAnimation(playerPath, 'traveled-path');
         
-        // Add level complete overlay
         const overlay = document.createElement('div');
         overlay.className = 'level-complete-overlay';
         overlay.textContent = '🎉 LEVEL UP! 🎉';
         gameEl.style.position = 'relative';
         gameEl.appendChild(overlay);
         
-        // Show toast message
-        showToast('🎊 Level Complete! Your path is highlighted...');
+        showToast('🎊 Level Complete! +1 Boost earned!');
         
-        // End round after animations complete
         setTimeout(() => {
             overlay.remove();
             endRound(true);
@@ -456,7 +636,6 @@
                 sparkle.className = 'sparkle';
                 sparkle.style.background = colors[Math.floor(Math.random() * colors.length)];
                 
-                // Random direction
                 const angle = (Math.PI * 2 * i) / sparkleCount;
                 const distance = 30 + Math.random() * 20;
                 const tx = Math.cos(angle) * distance;
@@ -482,18 +661,16 @@
         const t = Math.floor((Date.now() - roundStartTime - totalPausedTime) / 1000);
         sessionResults.push({ round: level, time: t, moves, keys: keysCollected, solved });
 
-        // Advance only on success; on failure retry the same level.
         if (solved) {
             level = level >= 150 ? 1 : level + 1;
             setTimeout(() => startRound(), 350);
         } else {
-            // Show solution path on failure
             showToast('⏱️ Time\'s up! Here\'s the solution path...');
             const solutionPath = calculateSolutionPath();
             if (solutionPath.length > 0) {
                 showPathWithAnimation(solutionPath, 'solution-path');
             }
-            setTimeout(() => startRound(), 3000); // Give more time to see solution
+            setTimeout(() => startRound(), 3000);
         }
     }
 
@@ -501,7 +678,7 @@
         if (running) {
             running = false;
             clearInterval(roundTimer);
-            const t = Math.floor((Date.now() - roundStartTime) / 1000);
+            const t = Math.floor((Date.now() - roundStartTime - totalPausedTime) / 1000);
             sessionResults.push({ round: level, time: t, moves, keys: keysCollected, solved: false });
         }
         showSummary();
@@ -526,7 +703,6 @@
         introEl.classList.remove("hidden");
     };
 
-    // Populate level selector
     for (let i = 1; i <= 150; i++) {
         const opt = document.createElement("option");
         opt.value = i;
@@ -542,13 +718,40 @@
         startRound();
     };
 
-    // Pause functionality
+    tutorialBtn.onclick = () => {
+        tutorialStepIndex = 0;
+        tutorialOverlay.classList.remove('hidden');
+        showTutorialStep(0);
+    };
+
+    tutorialNext.onclick = () => {
+        showTutorialStep(tutorialStepIndex + 1);
+    };
+
+    tutorialSkip.onclick = () => {
+        endTutorial();
+    };
+
     pauseBtn.onclick = () => {
         if (!running || paused) return;
         paused = true;
         pauseStartTime = Date.now();
         pauseOverlay.classList.remove('hidden');
         showToast('⏸ Game Paused');
+    };
+
+    addTimeBtn.onclick = () => {
+        if (!running || paused) return;
+        if (earnedBoosts <= 0) {
+            showToast('⏱️ No boosts available! Complete levels to earn more.');
+            return;
+        }
+        earnedBoosts--;
+        localStorage.setItem("earnedBoosts", earnedBoosts.toString());
+        roundSeconds += 60;
+        updateBoostDisplay();
+        timerEl.textContent = formatTime(roundSeconds);
+        showToast(`⏱️ +60s added! (${earnedBoosts} boosts left)`);
     };
 
     resumeBtn.onclick = () => {
